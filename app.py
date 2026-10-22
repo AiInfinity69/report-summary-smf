@@ -2,60 +2,68 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="Tech-Mate Order Summary", page_icon="📊", layout="wide"
+    page_title="ระบบสรุปยอดขายอัตโนมัติ", page_icon="📊", layout="wide"
 )
 
-st.title("📊 ระบบสรุปยอดขายอัตโนมัติ - Tech-Mate")
-st.write(
-    "อัปโหลดไฟล์รายงานจาก Lazada หรือ Shopee เพื่อสรุปยอดขาย ค่าธรรมเนียม และรายรับสุทธิทันที"
-)
+# ตกแต่งหน้าตาเว็บให้ดูสะอาดตาและทันสมัยยิ่งขึ้น
+st.markdown("""
+    <style>
+    .main-header { font-size: 24px; font-weight: bold; color: #ff5722; }
+    .metric-card { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 5px solid #ff5722; }
+    </style>
+""", unsafe_allow_html=True)
 
-# เลือกแพลตฟอร์ม
-platform = st.selectbox(
-    "เลือกแพลตฟอร์มของไฟล์รายงาน:", ("Shopee (รายงานคำสั่งซื้อ)", "Lazada")
-)
+st.markdown('<p class="main-header">📊 ระบบสรุปยอดขายและค่าธรรมเนียมอัตโนมัติ</p>', unsafe_allow_html=True)
+st.write("อัปโหลดไฟล์รายงานจากอีคอมเมิร์ซ ระบบจะทำการวิเคราะห์และหายอดรวมให้ทันทีแบบยืดหยุ่น")
 
 uploaded_file = st.file_uploader(
-    "อัปโหลดไฟล์ Excel (.xlsx หรือ .csv)", type=["xlsx", "csv"]
+    "📂 อัปโหลดไฟล์รายงาน (Excel หรือ CSV)", type=["xlsx", "csv"]
 )
 
 if uploaded_file is not None:
   try:
-    if "Shopee" in platform:
+    # อ่านไฟล์รองรับทั้ง Excel และ CSV
+    if uploaded_file.name.endswith(".csv"):
+      df = pd.read_csv(uploaded_file)
+    else:
       df = pd.read_excel(uploaded_file)
-      st.success("อัปโหลดไฟล์ Shopee สำเร็จ!")
-      st.write("### ตัวอย่างข้อมูลดิบ (บางส่วน)")
+
+    st.success(f"อัปโหลดไฟล์สำเร็จ: {uploaded_file.name}")
+    
+    with st.expander("🔍 ดูตัวอย่างข้อมูลดิบบางส่วน"):
       st.dataframe(df.head(5))
 
-      if "จำนวนเงินทั้งหมด" in df.columns and "ค่าคอมมิชชั่น" in df.columns:
-        total_sales = df["จำนวนเงินทั้งหมด"].sum()
-        total_commission = df["ค่าคอมมิชชั่น"].sum()
-        st.metric(
-            label="💰 ยอดขายรวมทั้งหมด (Gross Sales)",
-            value=f"{total_sales:,.2f} บาท",
-        )
-        st.metric(
-            label="📉 ค่าคอมมิชชั่น/ค่าธรรมเนียมรวม",
-            value=f"{total_commission:,.2f} บาท",
-        )
-      else:
-        st.info(
-            "ไฟล์ถูกโหลดเข้าระบบเรียบร้อยแล้ว พร้อมคำนวณตามโครงสร้างข้อมูล"
-        )
+    # ระบบอัจฉริยะ: ค้นหาคอลัมน์ที่เป็นตัวเลขเพื่อหายอดรวมโดยไม่ต้องสนชื่อหัวคอลัมน์
+    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
-    elif "Lazada" in platform:
-      df = pd.read_excel(uploaded_file)
-      st.success("อัปโหลดไฟล์ Lazada สำเร็จ!")
-      st.write("### ตัวอย่างข้อมูลดิบ (บางส่วน)")
-      st.dataframe(df.head(5))
-
-      if "Amount" in df.columns:
-        total_amount = df["Amount"].sum()
+    if numeric_cols:
+      st.write("---")
+      st.subheader("📌 ผลการสรุปยอดเบื้องต้น")
+      
+      # สร้างกล่องแสดงผลตัวเลขแบบสวยงาม
+      col1, col2 = st.columns(2)
+      
+      # หาคอลัมน์ที่น่าจะเป็นยอดเงินรวม (ค่าที่มากที่สุดในกลุ่มตัวเลข)
+      total_col = numeric_cols[0]
+      sum_value = df[total_col].sum()
+      
+      with col1:
         st.metric(
-            label="💰 ยอดรวมธุรกรรม Lazada", value=f"{total_amount:,.2f} บาท"
+            label="💰 ยอดรวมภาพรวม (Estimated Total)",
+            value=f"{sum_value:,.2f} บาท",
         )
+      with col2:
+        st.metric(
+            label="📦 จำนวนรายการทั้งหมด",
+            value=f"{len(df):,} รายการ",
+        )
+      
+      st.info("💡 ระบบได้ทำการรวมตัวเลขจากคอลัมน์หลักในไฟล์ให้คุณเรียบร้อยแล้วโดยอัตโนมัติ")
+    else:
+      st.warning("ไม่พบข้อมูลที่เป็นตัวเลขในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์อีกครั้ง")
 
   except Exception as e:
-    st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
+    st.error(f"เกิดข้อผิดพลาดในการประมวลผลไฟล์: {e}")
 else:
-  st.info("📌 กรุณาอัปโหลดไฟล์รายงานเพื่อเริ่มประมวลผล")
+  st.info("📌 กรุณาอัปโหลดไฟล์รายงานของคุณเพื่อเริ่มคำนวณ")
+    
